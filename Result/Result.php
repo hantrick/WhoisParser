@@ -268,25 +268,21 @@ class Result extends AbstractResult
                     }
                     
                     if (! isset($this->contacts->{$this->lastHandle}[$this->lastId])) {
-                        // This happens if the template fails to parse contacts correctly
-                        // But normally causes a fatal error, so unless we manually trigger an error first,
-                        // all stacktrace information is lost
-                        if (($this->lastId === -1) || ($this->lastHandle === null)) {
-                            trigger_error("Unexpected values for lastHandle / lastId", E_USER_WARNING);
+                        if (null === $this->lastHandle) {
+                            continue;
                         }
                         $this->contacts->{$this->lastHandle}[$this->lastId] = new Contact();
                     }
-
-                    $contact = $this->contacts->{$this->lastHandle}[$this->lastId];
-                    $contact->addItem($type, $value, $append);
+                    
+                    $this->contacts->{$this->lastHandle}[$this->lastId]->$type = $value;
                 } else {
                     // if last element of target is reached we need to add value
                     if ($key === sizeof($targetArray) - 1) {
-                        $targetItem = $element;
-                        if (is_array($targetItem)) {
-                            $targetItem = $targetItem[sizeof($targetItem) - 1];
+                        if (is_array($element)) {
+                            $element[sizeof($element) - 1]->$type = $value;
+                        } else {
+                            $element->$type = $value;
                         }
-                        $targetItem->addItem($type, $value, $append);
                         break;
                     }
                     
@@ -303,7 +299,7 @@ class Result extends AbstractResult
                                 $element->$type = new Registrar();
                                 break;
                             default:
-                                $element->$type = new OtherResult();
+                                $element->$type = new \stdClass();
                         }
                     }
                     
@@ -339,6 +335,15 @@ class Result extends AbstractResult
         $this->lastId = - 1;
     }
 
+    /**
+     * Convert properties to json
+     * 
+     * @return string
+     */
+    public function toJson()
+    {
+        return json_encode($this->toArray());
+    }
 
     /**
      * Convert properties to array
@@ -544,35 +549,5 @@ class Result extends AbstractResult
         }
 
         return (strlen($timestamp) ? strftime($dateformat, $timestamp) : $date);
-    }
-
-
-    /**
-     * Merge another result with this one, taking the other results values as preferred.
-     *
-     * @param Result $result
-     * @todo Do we want to improve handling of contacts? How to handle multiple contacts of same type?
-     */
-    public function mergeFrom(Result $result)
-    {
-        $properties = array_keys(get_object_vars($result));
-        foreach ($properties as $prop) {
-            // Foreign value not set
-            if ($result->$prop === null) {
-                continue;
-            }
-
-            // Foreign value is an empty array
-            if (is_array($result->$prop) && (count($result->$prop) < 1)) {
-                continue;
-            }
-
-            // Foreign value is an empty string
-            if (is_string($result->$prop) && (strlen($result->$prop) < 1)) {
-                continue;
-            }
-
-            $this->$prop = $result->$prop;
-        }
     }
 }
